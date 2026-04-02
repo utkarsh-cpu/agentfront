@@ -1,6 +1,6 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { Context } from 'hono'
-import { store } from './store.js'
+import { localstore } from './store.js'
 import type { AuthResponse, User, UserRecord } from '../types/domain.js'
 
 const ACCESS_TOKEN_PREFIX = 'atk_'
@@ -11,17 +11,20 @@ export function createId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`
 }
 
-export function hashPassword(password: string) {
-  return `demo:${password}`
+export async function hashPassword(password: string) {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
-export function verifyPassword(password: string, passwordHash: string) {
-  return hashPassword(password) === passwordHash
+export async function verifyPassword(password: string, passwordHash: string) {
+  return (await hashPassword(password)) === passwordHash
 }
 
 export function issueAccessToken(userId: string) {
   const token = `${ACCESS_TOKEN_PREFIX}${crypto.randomUUID()}`
-  store.accessTokens.set(token, userId)
+  localstore.accessTokens.set(token, userId)
   return token
 }
 
@@ -29,7 +32,7 @@ export function issueRefreshToken(userId: string, rememberMe = false) {
   const token = `${REFRESH_TOKEN_PREFIX}${crypto.randomUUID()}`
   const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7
 
-  store.refreshSessions.set(token, {
+  localstore.refreshSessions.set(token, {
     token,
     userId,
     expiresAt: Date.now() + maxAge * 1000,
@@ -60,16 +63,16 @@ export function getRefreshTokenFromCookie(c: Context) {
 
 export function revokeRefreshToken(token?: string | null) {
   if (!token) return
-  store.refreshSessions.delete(token)
+  localstore.refreshSessions.delete(token)
 }
 
 export function getUserFromAccessToken(token?: string | null): UserRecord | null {
   if (!token) return null
 
-  const userId = store.accessTokens.get(token)
+  const userId = localstore.accessTokens.get(token)
   if (!userId) return null
 
-  return store.users.get(userId) ?? null
+  return localstore.users.get(userId) ?? null
 }
 
 export function getBearerToken(c: Context) {

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { createId, requireAuth } from '../lib/auth.js'
-import { store } from '../lib/store.js'
+import { localstore as store} from '../lib/store.js'
 import { runAgentTaskExecution, streamAgentReply } from '../services/execution.js'
 import type {
   AgentRecord,

@@ -11,7 +11,8 @@ function conversationKey(userId: string, agentId: string) {
   return `${userId}:${agentId}`
 }
 
-export const store = {
+
+export const localstore = {
   users: new Map<string, UserRecord>(),
   usersByEmail: new Map<string, string>(),
   accessTokens: new Map<string, string>(),

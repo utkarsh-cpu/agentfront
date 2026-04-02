@@ -13,7 +13,7 @@ import {
   toPublicUser,
   verifyPassword,
 } from '../lib/auth.js'
-import { store } from '../lib/store.js'
+import { localstore } from '../lib/store.js'
 import type { UserRecord } from '../types/domain.js'
 
 const loginSchema = z.object({
@@ -47,10 +47,10 @@ export const authRoutes = new Hono()
 
 authRoutes.post('/login', async (c) => {
   const payload = loginSchema.parse(await c.req.json())
-  const userId = store.usersByEmail.get(payload.email.toLowerCase())
-  const user = userId ? store.users.get(userId) : null
+  const userId = localstore.usersByEmail.get(payload.email.toLowerCase())
+  const user = userId ? localstore.users.get(userId) : null
 
-  if (!user || !verifyPassword(payload.password, user.passwordHash)) {
+  if (!user || !(await verifyPassword(payload.password, user.passwordHash))) {
     return c.json({ message: 'Invalid email or password' }, 401)
   }
 
@@ -65,7 +65,7 @@ authRoutes.post('/register', async (c) => {
   const payload = registerSchema.parse(await c.req.json())
   const email = payload.email.toLowerCase()
 
-  if (store.usersByEmail.has(email)) {
+  if (localstore.usersByEmail.has(email)) {
     return c.json({ message: 'An account with this email already exists' }, 409)
   }
 
@@ -74,11 +74,11 @@ authRoutes.post('/register', async (c) => {
     email,
     name: payload.name,
     createdAt: new Date().toISOString(),
-    passwordHash: hashPassword(payload.password),
+    passwordHash: await hashPassword(payload.password),
   }
 
-  store.users.set(user.id, user)
-  store.usersByEmail.set(email, user.id)
+  localstore.users.set(user.id, user)
+  localstore.usersByEmail.set(email, user.id)
 
   const token = issueAccessToken(user.id)
   const refresh = issueRefreshToken(user.id)
@@ -89,7 +89,7 @@ authRoutes.post('/register', async (c) => {
 
 authRoutes.post('/refresh', (c) => {
   const refreshToken = getRefreshTokenFromCookie(c)
-  const session = refreshToken ? store.refreshSessions.get(refreshToken) : null
+  const session = refreshToken ? localstore.refreshSessions.get(refreshToken) : null
 
   if (!session || session.expiresAt < Date.now()) {
     clearRefreshCookie(c)
@@ -99,7 +99,7 @@ authRoutes.post('/refresh', (c) => {
     return c.json({ message: 'Refresh token expired' }, 401)
   }
 
-  const user = store.users.get(session.userId)
+  const user = localstore.users.get(session.userId)
   if (!user) {
     clearRefreshCookie(c)
     revokeRefreshToken(refreshToken)
@@ -119,11 +119,11 @@ authRoutes.post('/logout', (c) => {
 
 authRoutes.post('/forgot-password', async (c) => {
   const payload = forgotPasswordSchema.parse(await c.req.json())
-  const userId = store.usersByEmail.get(payload.email.toLowerCase())
+  const userId = localstore.usersByEmail.get(payload.email.toLowerCase())
 
   if (userId) {
     const token = createId('reset')
-    store.passwordResets.set(token, {
+    localstore.passwordResets.set(token, {
       token,
       userId,
       expiresAt: Date.now() + 1000 * 60 * 30,
@@ -135,18 +135,18 @@ authRoutes.post('/forgot-password', async (c) => {
 
 authRoutes.post('/reset-password', async (c) => {
   const payload = resetPasswordSchema.parse(await c.req.json())
-  const reset = store.passwordResets.get(payload.token)
+  const reset = localstore.passwordResets.get(payload.token)
 
   if (!reset || reset.expiresAt < Date.now() || reset.usedAt) {
     return c.json({ message: 'Reset token is invalid or expired' }, 400)
   }
 
-  const user = store.users.get(reset.userId)
+  const user = localstore.users.get(reset.userId)
   if (!user) {
     return c.json({ message: 'User not found' }, 404)
   }
 
-  user.passwordHash = hashPassword(payload.password)
+  user.passwordHash =  await hashPassword(payload.password)
   reset.usedAt = Date.now()
 
   return c.body(null, 204)

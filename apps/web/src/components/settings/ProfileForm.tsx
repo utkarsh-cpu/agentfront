@@ -21,7 +21,8 @@ export function ProfileForm() {
     defaultValues: { name: user?.name ?? "", email: user?.email ?? "" },
   })
 
-  const onSubmit = async (_data: ProfileData) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const onSubmit = async (_: ProfileData) => {
     // API call would go here
     await new Promise((r) => setTimeout(r, 500))
   }

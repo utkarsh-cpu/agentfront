@@ -116,7 +116,7 @@ export interface CreateAgentInput {
   maxTokens?: number
 }
 
-export interface UpdateAgentInput extends Partial<CreateAgentInput> {}
+export type UpdateAgentInput = Partial<CreateAgentInput>
 
 export interface TaskFilters {
   status?: TaskStatus

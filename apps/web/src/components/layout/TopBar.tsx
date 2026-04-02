@@ -23,7 +23,6 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@workspace/ui/components/avatar"
-import { cn } from "@workspace/ui/lib/utils"
 import { useUIStore } from "@/stores/ui.store"
 import { useAuthStore } from "@/stores/auth.store"
 import { useTheme } from "@/components/theme-provider"

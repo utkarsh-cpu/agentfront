@@ -11,7 +11,6 @@ import { CommandPalette } from "./CommandPalette"
 export function AppLayout() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
-  const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen)
 
   useEffect(() => {

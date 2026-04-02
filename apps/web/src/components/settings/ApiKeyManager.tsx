@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Copy, Trash, Plus, Key, Eye, EyeSlash } from "@phosphor-icons/react"
+import { Trash, Plus, Key } from "@phosphor-icons/react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"

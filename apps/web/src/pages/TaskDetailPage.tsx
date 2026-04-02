@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useCallback, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useAbortController } from "@/hooks/useAbortController"
 import { tasksService } from "@/services/tasks.service"
@@ -12,15 +12,18 @@ export function TaskDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { getSignal } = useAbortController()
 
-  useEffect(() => {
+  const fetchTask = useCallback(() => {
     if (!taskId) return
-    setIsLoading(true)
     tasksService
       .getTask(taskId, getSignal())
       .then(setTask)
       .catch(() => setTask(null))
       .finally(() => setIsLoading(false))
   }, [taskId, getSignal])
+
+  useEffect(() => {
+    fetchTask()
+  }, [fetchTask])
 
   if (isLoading || !task) {
     return (

@@ -22,8 +22,8 @@ export function RightPanel() {
       {/* Panel */}
       <aside
         className={cn(
-          "fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l border-border bg-background transition-transform duration-200 ease-in-out sm:w-96 md:relative md:z-0",
-          open ? "translate-x-0" : "translate-x-full"
+          "fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-background transition-transform duration-200 ease-in-out sm:w-96",
+          open ? "translate-x-0" : "pointer-events-none translate-x-full"
         )}
       >
         {/* Header */}

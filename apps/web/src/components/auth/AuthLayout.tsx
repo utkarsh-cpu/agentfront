@@ -11,6 +11,16 @@ const terminalLines = [
   '> awaiting credentials_',
 ]
 
+const systemStatusArt = [
+  '╔═════════════════════════════════╗',  // 35 chars wide
+'║  ░░░░░░  NEXUS SYSTEMS  ░░░░░░  ║',
+'║─────────────────────────────────║',
+'║  STATUS: OPERATIONAL            ║',
+'║  UPTIME: 99.97%                 ║',
+'║  AGENTS: STANDING BY            ║',
+'╚═════════════════════════════════╝',
+].join('\n')
+
 function TerminalAnimation() {
   const [visibleLines, setVisibleLines] = useState(0)
 
@@ -50,7 +60,7 @@ export function AuthLayout() {
       <div className="hidden w-1/2 flex-col justify-between border-r border-white/10 bg-black p-12 lg:flex">
         <div>
           <h1 className="font-heading text-4xl font-bold tracking-tight text-terminal">
-            NEXUS
+            AGENTCOMMAND
           </h1>
           <p className="mt-2 font-mono text-sm text-white/40">
             SECURE AGENT CONTROL INTERFACE v1.0
@@ -60,14 +70,11 @@ export function AuthLayout() {
         <div className="space-y-6">
           <TerminalAnimation />
 
-          <pre className="text-terminal/20 text-xs leading-tight select-none">
-{`╔══════════════════════════════════╗
-║  ▓▓▓▓▓▓  NEXUS SYSTEMS  ▓▓▓▓▓▓  ║
-║  ──────────────────────────────  ║
-║  STATUS: OPERATIONAL             ║
-║  UPTIME: 99.97%                  ║
-║  AGENTS: STANDING BY             ║
-╚══════════════════════════════════╝`}
+          <pre
+            className="w-fit whitespace-pre font-mono text-[11px] leading-[1.5] text-terminal/55 select-none"
+            style={{ fontVariantLigatures: 'none' }}
+          >
+            {systemStatusArt}
           </pre>
         </div>
 

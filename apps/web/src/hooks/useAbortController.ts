@@ -1,15 +1,17 @@
-import { useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 export function useAbortController() {
   const controllerRef = useRef<AbortController | null>(null)
 
-  const getSignal = () => {
+  const getSignal = useCallback(() => {
     controllerRef.current?.abort()
     controllerRef.current = new AbortController()
     return controllerRef.current.signal
-  }
+  }, [])
 
-  const abort = () => controllerRef.current?.abort()
+  const abort = useCallback(() => {
+    controllerRef.current?.abort()
+  }, [])
 
   useEffect(() => () => controllerRef.current?.abort(), [])
 

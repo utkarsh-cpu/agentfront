@@ -25,7 +25,7 @@ export function AppLayout() {
   }, [setCommandPaletteOpen])
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="relative flex h-screen w-full overflow-hidden bg-background text-foreground">
       {/* Desktop sidebar */}
       <div className="hidden md:flex">
         <Sidebar />
@@ -39,9 +39,9 @@ export function AppLayout() {
       </Sheet>
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>

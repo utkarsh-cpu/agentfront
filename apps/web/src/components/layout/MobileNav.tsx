@@ -9,7 +9,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 const tabs = [
-  { label: "Home", path: "/dashboard", icon: House },
+  { label: "Chat", path: "/chat", icon: House },
   { label: "Agents", path: "/agents", icon: Robot },
   { label: "Tasks", path: "/tasks", icon: ListChecks },
   { label: "History", path: "/history", icon: ClockCounterClockwise },

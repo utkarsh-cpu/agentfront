@@ -1,8 +1,9 @@
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   MagnifyingGlass,
   Bell,
   List,
+  House,
   Sun,
   Moon,
   User,
@@ -15,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
@@ -28,6 +30,7 @@ import { useAuthStore } from "@/stores/auth.store"
 import { useTheme } from "@/components/theme-provider"
 
 const routeTitles: Record<string, string> = {
+  "/chat": "Chat",
   "/dashboard": "Dashboard",
   "/agents": "Agents",
   "/tasks": "Tasks",
@@ -39,11 +42,12 @@ function getPageTitle(pathname: string): string {
   for (const [route, title] of Object.entries(routeTitles)) {
     if (pathname.startsWith(route)) return title
   }
-  return "Dashboard"
+  return "Chat"
 }
 
 export function TopBar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
@@ -127,12 +131,36 @@ export function TopBar() {
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 rounded-none">
-            <DropdownMenuItem className="gap-2 rounded-none">
+          <DropdownMenuContent align="end" className="w-56 rounded-none">
+            <DropdownMenuLabel className="rounded-none px-2 py-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-foreground">
+                  {user?.name ?? "User"}
+                </span>
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  {user?.email ?? "No email available"}
+                </span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 rounded-none"
+              onClick={() => navigate("/dashboard")}
+            >
+              <House className="h-4 w-4" />
+              Dashboard
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="gap-2 rounded-none"
+              onClick={() => navigate("/settings/profile")}
+            >
               <User className="h-4 w-4" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 rounded-none">
+            <DropdownMenuItem
+              className="gap-2 rounded-none"
+              onClick={() => navigate("/settings")}
+            >
               <Gear className="h-4 w-4" />
               Settings
             </DropdownMenuItem>

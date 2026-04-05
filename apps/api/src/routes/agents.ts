@@ -1,114 +1,99 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import { createId, requireAuth } from '../lib/auth.js'
-import { store } from '../lib/store.js'
+import { prisma } from '../lib/db.js'
+import {
+  serializeStringArray,
+  serializeToolCalls,
+  serializeTokenUsage,
+  toAgentRecord,
+  toDomainMessage,
+  toPublicAgent,
+  toPublicTask,
+} from '../lib/serializers.js'
 import { runAgentTaskExecution, streamAgentReply } from '../services/execution.js'
+import {
+  createAgentSchema,
+  updateAgentSchema,
+  runAgentSchema,
+  chatSchema,
+} from '../types/domain.js'
 import type {
-  AgentRecord,
-  CreateAgentInput,
   Message,
-  TaskRecord,
   UpdateAgentInput,
 } from '../types/domain.js'
 
-const createAgentSchema = z.object({
-  name: z.string().min(2),
-  description: z.string().min(1),
-  model: z.string().min(1),
-  systemPrompt: z.string().min(1),
-  tools: z.array(z.string()),
-  temperature: z.number().optional(),
-  maxTokens: z.number().optional(),
-})
-
-const updateAgentSchema = createAgentSchema.partial()
-
-const runAgentSchema = z.object({
-  input: z.string().min(1),
-})
-
-const chatSchema = z.object({
-  message: z.string().min(1),
-})
-
-function getAgentForUser(userId: string, agentId: string) {
-  const agent = store.agents.get(agentId)
-  if (!agent || agent.userId !== userId) {
-    return null
-  }
-
-  return agent
-}
-
-function createAgentRecord(userId: string, payload: CreateAgentInput): AgentRecord {
-  const now = new Date().toISOString()
-
-  return {
-    id: createId('agent'),
-    userId,
-    name: payload.name,
-    description: payload.description,
-    model: payload.model,
-    systemPrompt: payload.systemPrompt,
-    tools: payload.tools,
-    status: 'idle',
-    createdAt: now,
-    updatedAt: now,
-    temperature: payload.temperature,
-    maxTokens: payload.maxTokens,
-  }
-}
-
-function toPublicAgent(agent: AgentRecord) {
-  const { userId, temperature, maxTokens, ...publicAgent } = agent
-  void userId
-  void temperature
-  void maxTokens
-  return publicAgent
+async function getAgentForUser(userId: string, agentId: string) {
+  return prisma.agent.findFirst({
+    where: {
+      id: agentId,
+      userId,
+    },
+  })
 }
 
 export const agentRoutes = new Hono()
 
-agentRoutes.get('/', (c) => {
-  const user = requireAuth(c)
+agentRoutes.get('/', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agents = [...store.agents.values()]
-    .filter((agent) => agent.userId === user.id)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  const agents = (await prisma.agent.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' },
+  }))
     .map(toPublicAgent)
 
   return c.json(agents)
 })
 
 agentRoutes.post('/', async (c) => {
-  const user = requireAuth(c)
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
   const payload = createAgentSchema.parse(await c.req.json())
-  const agent = createAgentRecord(user.id, payload)
-  store.agents.set(agent.id, agent)
+  const agent = await prisma.agent.create({
+    data: {
+      id: createId('agent'),
+      userId: user.id,
+      name: payload.name,
+      description: payload.description,
+      modelName: payload.model,
+      systemPrompt: payload.systemPrompt,
+      toolsJson: serializeStringArray(payload.tools),
+      status: 'idle',
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+    },
+  })
 
   return c.json(toPublicAgent(agent), 201)
 })
 
 agentRoutes.post('/:id/chat', async (c) => {
-  const user = requireAuth(c)
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
   const payload = chatSchema.parse(await c.req.json())
-  const history = store.getConversation(user.id, agent.id)
-  const userMessage: Message = {
-    id: createId('msg'),
-    role: 'user',
-    content: payload.message,
-    createdAt: new Date().toISOString(),
-  }
+  const history = await prisma.message.findMany({
+    where: { userId: user.id, agentId: agent.id },
+    orderBy: { createdAt: 'asc' },
+  })
 
-  store.setConversation(user.id, agent.id, [...history, userMessage])
+  const userMessageRecord = await prisma.message.create({
+    data: {
+      id: createId('msg'),
+      userId: user.id,
+      agentId: agent.id,
+      role: 'user',
+      content: payload.message,
+    },
+  })
+
+  const userMessage = toDomainMessage(userMessageRecord)
+  const historyWithUserMessage: Message[] = [...history.map(toDomainMessage), userMessage]
 
   const encoder = new TextEncoder()
   let assistantContent = ''
@@ -117,9 +102,9 @@ agentRoutes.post('/:id/chat', async (c) => {
     async start(controller) {
       try {
         for await (const chunk of streamAgentReply({
-          agent,
+          agent: toAgentRecord(agent),
           message: payload.message,
-          history: [...history, userMessage],
+          history: historyWithUserMessage,
           signal: c.req.raw.signal,
         })) {
           assistantContent += chunk
@@ -136,7 +121,15 @@ agentRoutes.post('/:id/chat', async (c) => {
           createdAt: new Date().toISOString(),
         }
 
-        store.setConversation(user.id, agent.id, [...store.getConversation(user.id, agent.id), assistantMessage])
+        await prisma.message.create({
+          data: {
+            id: assistantMessage.id,
+            userId: user.id,
+            agentId: agent.id,
+            role: assistantMessage.role,
+            content: assistantMessage.content,
+          },
+        })
         controller.enqueue(encoder.encode('data: [DONE]\n\n'))
       } catch (error) {
         const data = JSON.stringify({ delta: 'An error occurred while streaming the response.' })
@@ -159,121 +152,152 @@ agentRoutes.post('/:id/chat', async (c) => {
   })
 })
 
-agentRoutes.get('/:id/chat/history', (c) => {
-  const user = requireAuth(c)
+agentRoutes.get('/:id/chat/history', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
-  return c.json(store.getConversation(user.id, agent.id))
+  const messages = await prisma.message.findMany({
+    where: { userId: user.id, agentId: agent.id },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  return c.json(messages.map(toDomainMessage))
 })
 
-agentRoutes.delete('/:id/chat/history', (c) => {
-  const user = requireAuth(c)
+agentRoutes.delete('/:id/chat/history', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
-  store.clearConversation(user.id, agent.id)
+  await prisma.message.deleteMany({
+    where: { userId: user.id, agentId: agent.id },
+  })
   return c.body(null, 204)
 })
 
 agentRoutes.post('/:id/run', async (c) => {
-  const user = requireAuth(c)
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
   const payload = runAgentSchema.parse(await c.req.json())
-  const startedAt = new Date().toISOString()
+  const startedAt = new Date()
   const taskId = createId('task')
 
-  const task: TaskRecord = {
-    id: taskId,
-    userId: user.id,
-    agentId: agent.id,
-    agentName: agent.name,
-    status: 'running',
-    input: payload.input,
-    toolCalls: [],
-    tokenUsage: { prompt: 0, completion: 0, total: 0 },
-    startedAt,
-  }
-
-  store.tasks.set(task.id, task)
+  await prisma.$transaction([
+    prisma.task.create({
+      data: {
+        id: taskId,
+        userId: user.id,
+        agentId: agent.id,
+        agentName: agent.name,
+        status: 'running',
+        input: payload.input,
+        toolCallsJson: serializeToolCalls([]),
+        tokenUsageJson: serializeTokenUsage({ prompt: 0, completion: 0, total: 0 }),
+        startedAt,
+      },
+    }),
+    prisma.agent.update({
+      where: { id: agent.id },
+      data: { status: 'running' },
+    }),
+  ])
 
   try {
-    agent.status = 'running'
-    agent.updatedAt = new Date().toISOString()
+    const result = await runAgentTaskExecution({
+      agent: toAgentRecord(agent),
+      input: payload.input,
+    })
 
-    const result = await runAgentTaskExecution({ agent, input: payload.input })
-    task.status = result.status
-    task.output = result.output
-    task.toolCalls = result.toolCalls
-    task.tokenUsage = result.tokenUsage
-    task.completedAt = new Date().toISOString()
-    agent.status = 'idle'
-    agent.updatedAt = new Date().toISOString()
+    const [task] = await prisma.$transaction([
+      prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: result.status,
+          output: result.output,
+          toolCallsJson: serializeToolCalls(result.toolCalls),
+          tokenUsageJson: serializeTokenUsage(result.tokenUsage),
+          completedAt: new Date(),
+        },
+      }),
+      prisma.agent.update({
+        where: { id: agent.id },
+        data: { status: 'idle' },
+      }),
+    ])
+
+    return c.json(toPublicTask(task))
   } catch (error) {
-    task.status = 'failed'
-    task.output = error instanceof Error ? error.message : 'Task execution failed'
-    task.completedAt = new Date().toISOString()
-    agent.status = 'error'
-    agent.updatedAt = new Date().toISOString()
-  }
+    const [task] = await prisma.$transaction([
+      prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: 'failed',
+          output: error instanceof Error ? error.message : 'Task execution failed',
+          completedAt: new Date(),
+        },
+      }),
+      prisma.agent.update({
+        where: { id: agent.id },
+        data: { status: 'error' },
+      }),
+    ])
 
-  return c.json(task)
+    return c.json(toPublicTask(task))
+  }
 })
 
-agentRoutes.get('/:id', (c) => {
-  const user = requireAuth(c)
+agentRoutes.get('/:id', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
   return c.json(toPublicAgent(agent))
 })
 
 agentRoutes.patch('/:id', async (c) => {
-  const user = requireAuth(c)
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
   const payload = updateAgentSchema.parse(await c.req.json()) as UpdateAgentInput
 
-  if (payload.name !== undefined) agent.name = payload.name
-  if (payload.description !== undefined) agent.description = payload.description
-  if (payload.model !== undefined) agent.model = payload.model
-  if (payload.systemPrompt !== undefined) agent.systemPrompt = payload.systemPrompt
-  if (payload.tools !== undefined) agent.tools = payload.tools
-  if (payload.temperature !== undefined) agent.temperature = payload.temperature
-  if (payload.maxTokens !== undefined) agent.maxTokens = payload.maxTokens
-  agent.updatedAt = new Date().toISOString()
+  const updatedAgent = await prisma.agent.update({
+    where: { id: agent.id },
+    data: {
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.description !== undefined ? { description: payload.description } : {}),
+      ...(payload.model !== undefined ? { modelName: payload.model } : {}),
+      ...(payload.systemPrompt !== undefined ? { systemPrompt: payload.systemPrompt } : {}),
+      ...(payload.tools !== undefined ? { toolsJson: serializeStringArray(payload.tools) } : {}),
+      ...(payload.temperature !== undefined ? { temperature: payload.temperature } : {}),
+      ...(payload.maxTokens !== undefined ? { maxTokens: payload.maxTokens } : {}),
+    },
+  })
 
-  return c.json(toPublicAgent(agent))
+  return c.json(toPublicAgent(updatedAgent))
 })
 
-agentRoutes.delete('/:id', (c) => {
-  const user = requireAuth(c)
+agentRoutes.delete('/:id', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const agent = getAgentForUser(user.id, c.req.param('id'))
+  const agent = await getAgentForUser(user.id, c.req.param('id'))
   if (!agent) return c.json({ message: 'Agent not found' }, 404)
 
-  store.agents.delete(agent.id)
-  store.clearConversation(user.id, agent.id)
-
-  for (const [taskId, task] of store.tasks.entries()) {
-    if (task.userId === user.id && task.agentId === agent.id) {
-      store.tasks.delete(taskId)
-    }
-  }
+  await prisma.agent.delete({ where: { id: agent.id } })
 
   return c.body(null, 204)
 })

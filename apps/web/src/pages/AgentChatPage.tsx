@@ -1,19 +1,21 @@
 import { useEffect } from "react"
 import { useParams } from "react-router-dom"
 import { useChatStore } from "@/stores/chat.store"
+import { useAgentStore } from "@/stores/agent.store"
 import { useAbortController } from "@/hooks/useAbortController"
 import { chatService } from "@/services/chat.service"
-import { ChatToolbar } from "@/components/chat/ChatToolbar"
 import { MessageList } from "@/components/chat/MessageList"
 import { ChatInput } from "@/components/chat/ChatInput"
 
 export function AgentChatPage() {
   const { agentId } = useParams<{ agentId: string }>()
   const { setActiveConversation, setMessages, addMessage, setStreaming, appendToStreaming, finalizeStreaming } = useChatStore()
+  const setLastAgentId = useAgentStore((s) => s.setLastAgentId)
   const { getSignal, abort } = useAbortController()
 
   useEffect(() => {
     if (!agentId) return
+    setLastAgentId(agentId)
     setActiveConversation(agentId)
     chatService
       .getConversationHistory(agentId, getSignal())
@@ -57,7 +59,6 @@ export function AgentChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
-      <ChatToolbar agentId={agentId ?? ""} />
       <MessageList />
       <ChatInput onSend={handleSend} onAbort={abort} />
     </div>

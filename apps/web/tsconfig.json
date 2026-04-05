@@ -8,7 +8,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@workspace/ui/*": ["../../packages/ui/src/*"],
+      "@workspace/types": ["../../packages/types/src/index.ts"],
+      "@workspace/types/*": ["../../packages/types/src/*"]
     }
   }
 }

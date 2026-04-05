@@ -25,8 +25,13 @@ Routes included:
 
 Current behavior:
 
-- Auth uses in-memory users and refresh sessions.
-- Agents, chat history, and tasks use in-memory storage.
-- LLM execution and task execution are stubbed in src/services/execution.ts.
+- Persistence uses Prisma with a local SQLite database.
+- Auth, agents, chat history, tasks, refresh sessions, and password resets are stored in the database.
+- LLM execution and task execution are still stubbed in src/services/execution.ts.
 
-Replace the execution service and the in-memory store with your own database and inference code.
+Setup:
+
+- Create apps/api/.env with `DATABASE_URL="file:./prisma/dev.db"`.
+- Run `bun install` at the repo root.
+- Run `bun run prisma:migrate` from apps/api to create the database.
+- Run `bun run prisma:generate` from apps/api if you need to regenerate the Prisma client.

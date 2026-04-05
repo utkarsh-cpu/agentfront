@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { requireAuth } from '../lib/auth.js'
-import { store } from '../lib/store.js'
+import { prisma } from '../lib/db.js'
+import { toPublicTask } from '../lib/serializers.js'
 import type { PaginatedResponse, Task, TaskStatus } from '../types/domain.js'
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -11,8 +12,8 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
 
 export const taskRoutes = new Hono()
 
-taskRoutes.get('/', (c) => {
-  const user = requireAuth(c)
+taskRoutes.get('/', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
   const status = c.req.query('status') as TaskStatus | undefined
@@ -22,32 +23,50 @@ taskRoutes.get('/', (c) => {
   const page = parsePositiveInteger(c.req.query('page'), 1)
   const pageSize = parsePositiveInteger(c.req.query('pageSize'), 20)
 
-  let tasks = [...store.tasks.values()]
-    .filter((task) => task.userId === user.id)
-    .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
-
-  if (status) {
-    tasks = tasks.filter((task) => task.status === status)
+  const where: {
+    userId: string
+    status?: TaskStatus
+    agentId?: string
+    startedAt?: {
+      gte?: Date
+      lte?: Date
+    }
+  } = {
+    userId: user.id,
   }
 
-  if (agentId) {
-    tasks = tasks.filter((task) => task.agentId === agentId)
+  if (status) where.status = status
+  if (agentId) where.agentId = agentId
+
+  if (dateFrom || dateTo) {
+    where.startedAt = {}
+    if (dateFrom) {
+      const from = new Date(dateFrom)
+      if (!Number.isNaN(from.getTime())) {
+        where.startedAt.gte = from
+      }
+    }
+    if (dateTo) {
+      const to = new Date(dateTo)
+      if (!Number.isNaN(to.getTime())) {
+        where.startedAt.lte = to
+      }
+    }
   }
 
-  if (dateFrom) {
-    tasks = tasks.filter((task) => task.startedAt >= dateFrom)
-  }
+  const [total, tasks] = await prisma.$transaction([
+    prisma.task.count({ where }),
+    prisma.task.findMany({
+      where,
+      orderBy: { startedAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ])
 
-  if (dateTo) {
-    tasks = tasks.filter((task) => task.startedAt <= dateTo)
-  }
-
-  const total = tasks.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const offset = (page - 1) * pageSize
-  const data = tasks.slice(offset, offset + pageSize)
   const response: PaginatedResponse<Task> = {
-    data,
+    data: tasks.map(toPublicTask),
     total,
     page,
     pageSize,
@@ -57,30 +76,47 @@ taskRoutes.get('/', (c) => {
   return c.json(response)
 })
 
-taskRoutes.get('/:id', (c) => {
-  const user = requireAuth(c)
+taskRoutes.get('/:id', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const task = store.tasks.get(c.req.param('id'))
+  const task = await prisma.task.findFirst({
+    where: {
+      id: c.req.param('id'),
+      userId: user.id,
+    },
+  })
+
   if (!task || task.userId !== user.id) {
     return c.json({ message: 'Task not found' }, 404)
   }
 
-  return c.json(task)
+  return c.json(toPublicTask(task))
 })
 
-taskRoutes.post('/:id/cancel', (c) => {
-  const user = requireAuth(c)
+taskRoutes.post('/:id/cancel', async (c) => {
+  const user = await requireAuth(c)
   if (!user) return c.json({ message: 'Unauthorized' }, 401)
 
-  const task = store.tasks.get(c.req.param('id'))
+  const task = await prisma.task.findFirst({
+    where: {
+      id: c.req.param('id'),
+      userId: user.id,
+    },
+  })
+
   if (!task || task.userId !== user.id) {
     return c.json({ message: 'Task not found' }, 404)
   }
 
   if (task.status === 'queued' || task.status === 'running') {
-    task.status = 'cancelled'
-    task.completedAt = new Date().toISOString()
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    })
   }
 
   return c.body(null, 204)

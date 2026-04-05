@@ -7,14 +7,30 @@
     "dev": "bun --watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "bun dist/index.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:generate": "bun --env-file=.env prisma generate --schema prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:studio": "prisma studio --schema prisma/schema.prisma",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
+    "@prisma/adapter-libsql": "^7.5.0",
+    "@prisma/client": "^7.5.0",
     "@hono/node-server": "^1.19.12",
+    "@workspace/types": "workspace:*",
     "hono": "^4.12.9",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@types/bun": "^1.2.18",
+    "@workspace/eslint-config": "workspace:*",
+    "eslint": "^9.39.2",
+    "prisma": "^7.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.1"
   }
 }

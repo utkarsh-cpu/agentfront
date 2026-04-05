@@ -58,10 +58,10 @@ interface StatsGridProps {
 }
 
 export function StatsGrid({
-  activeAgents = 3,
-  tasksToday = 24,
-  tokensUsed = 48200,
-  successRate = 96,
+  activeAgents = 0,
+  tasksToday = 0,
+  tokensUsed = 0,
+  successRate = 0,
 }: StatsGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

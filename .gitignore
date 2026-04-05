@@ -21,6 +21,10 @@ coverage
 
 # Build Outputs
 dist
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+apps/api/*.db
+apps/api/*.db-journal
 
 # Debug
 npm-debug.log*

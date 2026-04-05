@@ -33,7 +33,7 @@ export function LoginPage() {
     setFormError(null)
     try {
       await login({ email: data.email, password: data.password, rememberMe: data.rememberMe })
-      navigate('/dashboard', { replace: true })
+      navigate('/chat', { replace: true })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Authentication failed')
     }

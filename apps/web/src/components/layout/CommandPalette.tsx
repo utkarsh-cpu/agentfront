@@ -35,11 +35,11 @@ export function CommandPalette() {
   const items: CommandItem[] = useMemo(
     () => [
       {
-        id: "dashboard",
-        label: "Dashboard",
+        id: "chat",
+        label: "Chat",
         group: "Pages",
         icon: House,
-        action: () => navigate("/dashboard"),
+        action: () => navigate("/chat"),
       },
       {
         id: "agents",

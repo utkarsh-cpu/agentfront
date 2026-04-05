@@ -1,13 +1,16 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { secureHeaders } from 'hono/secure-headers'
 import { authRoutes } from './routes/auth.js'
 import { agentRoutes } from './routes/agents.js'
 import { taskRoutes } from './routes/tasks.js'
+import { rateLimiter } from './middleware/rate-limit.js'
 
 const app = new Hono()
 
 app.use('*', logger())
+app.use('*', secureHeaders())
 app.use(
   '/api/*',
   cors({
@@ -17,6 +20,9 @@ app.use(
     credentials: true,
   }),
 )
+
+// Rate limit auth endpoints: 20 requests per minute per IP
+app.use('/api/auth/*', rateLimiter({ windowMs: 60_000, max: 20 }))
 
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok' })

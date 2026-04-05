@@ -100,7 +100,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           credentials: 'include',
         }
       )
-      if (!res.ok) return false
+      if (!res.ok) {
+        set({ user: null, token: null, isAuthenticated: false, isLoading: false })
+        return false
+      }
       const data = await res.json()
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false })
       return true

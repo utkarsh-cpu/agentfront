@@ -8,16 +8,10 @@ const statusStyles = {
 }
 
 interface SystemHealthBarProps {
-  health?: SystemHealth
+  health: SystemHealth
 }
 
-const defaultHealth: SystemHealth = {
-  api: "operational",
-  latencyMs: 42,
-  modelsAvailable: ["gpt-4o", "gpt-4o-mini", "claude-3.5-sonnet"],
-}
-
-export function SystemHealthBar({ health = defaultHealth }: SystemHealthBarProps) {
+export function SystemHealthBar({ health }: SystemHealthBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 border border-border/50 bg-card px-4 py-2.5 font-mono text-[10px] tracking-wider">
       <div className="flex items-center gap-2">
@@ -37,7 +31,7 @@ export function SystemHealthBar({ health = defaultHealth }: SystemHealthBarProps
       <span className="text-border">|</span>
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground uppercase">Models:</span>
-        <span className="text-foreground">{health.modelsAvailable.length} available</span>
+        <span className="text-foreground">{health.modelsAvailable.length}</span>
       </div>
     </div>
   )

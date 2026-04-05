@@ -10,6 +10,7 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area"
 import { cn } from "@workspace/ui/lib/utils"
 import type { ActivityEvent } from "@/types"
 import { RelativeTime } from "@/components/shared/RelativeTime"
+import { EmptyState } from "@/components/shared/EmptyState"
 
 const iconMap: Record<ActivityEvent["type"], { icon: React.ElementType; color: string }> = {
   task_started: { icon: Play, color: "text-blue-400" },
@@ -20,19 +21,22 @@ const iconMap: Record<ActivityEvent["type"], { icon: React.ElementType; color: s
   error: { icon: Warning, color: "text-destructive" },
 }
 
-const demoEvents: ActivityEvent[] = [
-  { id: "1", type: "task_completed", message: "Data analysis task completed successfully", agentName: "Analyst", timestamp: new Date(Date.now() - 120000).toISOString() },
-  { id: "2", type: "tool_call", message: "Web search executed for market data", agentName: "Researcher", timestamp: new Date(Date.now() - 300000).toISOString() },
-  { id: "3", type: "task_started", message: "Code review task initiated", agentName: "Reviewer", timestamp: new Date(Date.now() - 600000).toISOString() },
-  { id: "4", type: "agent_created", message: "New agent 'Summarizer' created", timestamp: new Date(Date.now() - 1800000).toISOString() },
-  { id: "5", type: "task_failed", message: "API integration task failed — rate limit exceeded", agentName: "Builder", timestamp: new Date(Date.now() - 3600000).toISOString() },
-]
-
 interface RecentActivityFeedProps {
   events?: ActivityEvent[]
 }
 
-export function RecentActivityFeed({ events = demoEvents }: RecentActivityFeedProps) {
+export function RecentActivityFeed({ events = [] }: RecentActivityFeedProps) {
+  if (events.length === 0) {
+    return (
+      <EmptyState
+        icon={<Warning weight="duotone" />}
+        title="No Activity Yet"
+        description="Recent task and agent activity will appear here once the system has real events to show."
+        className="h-72 border-0 bg-transparent p-6"
+      />
+    )
+  }
+
   return (
     <ScrollArea className="h-72">
       <div className="space-y-1">

@@ -28,7 +28,7 @@ import { useUIStore } from "@/stores/ui.store"
 import { useAuthStore } from "@/stores/auth.store"
 
 const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: House },
+  { label: "Chat", path: "/chat", icon: House },
   { label: "Agents", path: "/agents", icon: Robot, badge: true },
   { label: "Tasks", path: "/tasks", icon: ListChecks },
   { label: "History", path: "/history", icon: ClockCounterClockwise },

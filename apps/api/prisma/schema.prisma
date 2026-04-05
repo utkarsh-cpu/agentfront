@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id              String           @id
+  email           String           @unique
+  name            String
+  avatarUrl       String?
+  passwordHash    String
+  createdAt       DateTime         @default(now())
+  accessTokens    AccessToken[]
+  refreshSessions RefreshSession[]
+  passwordResets  PasswordReset[]
+  agents          Agent[]
+  tasks           Task[]
+  messages        Message[]
+}
+
+model AccessToken {
+  token     String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RefreshSession {
+  token     String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  token     String   @id
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Agent {
+  id          String    @id
+  userId      String
+  name        String
+  description String
+  modelName   String
+  systemPrompt String
+  toolsJson   String
+  status      String
+  temperature Float?
+  maxTokens   Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  tasks       Task[]
+
+  @@index([userId, createdAt])
+}
+
+model Task {
+  id            String    @id
+  userId        String
+  agentId       String
+  agentName     String?
+  status        String
+  input         String
+  output        String?
+  toolCallsJson String    @default("[]")
+  tokenUsageJson String   @default("{\"prompt\":0,\"completion\":0,\"total\":0}")
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([agentId])
+}
+
+model Message {
+  id            String    @id
+  userId        String
+  agentId       String
+  role          String
+  content       String
+  toolCallsJson String?
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, agentId, createdAt])
+}

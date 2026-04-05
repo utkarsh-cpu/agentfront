@@ -25,10 +25,9 @@ function estimateTokenUsage(input: string, output: string): TokenUsage {
 
 export async function* streamAgentReply({ agent, message, history, signal }: ChatExecutionInput) {
   const reply = [
-    `Scaffold response from ${agent.name}.`,
-    'Replace apps/api/src/services/execution.ts with your own inference call.',
-    `Received message: ${message}`,
-    `History messages available: ${history.length}`,
+    `${agent.name} received your message.`,
+    `Input: ${message}`,
+    `Conversation messages: ${history.length}`,
   ].join(' ')
 
   const chunks = reply.split(' ')
@@ -45,8 +44,7 @@ export async function* streamAgentReply({ agent, message, history, signal }: Cha
 
 export async function runAgentTaskExecution({ agent, input }: TaskExecutionInput): Promise<Pick<Task, 'status' | 'output' | 'toolCalls' | 'tokenUsage'>> {
   const output = [
-    `Task scaffold executed for agent ${agent.name}.`,
-    'Replace runAgentTaskExecution() with your own orchestration code.',
+    `${agent.name} completed the requested task.`,
     `Input: ${input}`,
   ].join(' ')
 

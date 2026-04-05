@@ -79,7 +79,7 @@ export function RegisterPage() {
         password: data.password,
         confirmPassword: data.confirmPassword,
       })
-      navigate('/dashboard', { replace: true })
+      navigate('/chat', { replace: true })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Registration failed')
     }

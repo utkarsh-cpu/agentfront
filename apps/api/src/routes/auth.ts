@@ -1,132 +1,122 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import {
   clearRefreshCookie,
   createId,
+  getBearerToken,
   getRefreshTokenFromCookie,
   hashPassword,
   issueAccessToken,
   issueRefreshToken,
+  revokeAccessToken,
   revokeRefreshToken,
   setRefreshCookie,
   toAuthResponse,
   toPublicUser,
   verifyPassword,
 } from '../lib/auth.js'
-import { store } from '../lib/store.js'
-import type { UserRecord } from '../types/domain.js'
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-  rememberMe: z.boolean().optional(),
-})
-
-const registerSchema = z
-  .object({
-    name: z.string().min(1),
-    email: z.string().email(),
-    password: z.string().min(8),
-    confirmPassword: z.string().min(8),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  })
-
-const forgotPasswordSchema = z.object({
-  email: z.string().email(),
-})
-
-const resetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: z.string().min(8),
-})
+import { prisma } from '../lib/db.js'
+import { toUserRecord } from '../lib/serializers.js'
+import {
+  loginSchema,
+  registerSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from '../types/domain.js'
 
 export const authRoutes = new Hono()
 
 authRoutes.post('/login', async (c) => {
   const payload = loginSchema.parse(await c.req.json())
-  const userId = store.usersByEmail.get(payload.email.toLowerCase())
-  const user = userId ? store.users.get(userId) : null
+  const user = await prisma.user.findUnique({
+    where: { email: payload.email.toLowerCase() },
+  })
 
-  if (!user || !verifyPassword(payload.password, user.passwordHash)) {
+  if (!user || !(await verifyPassword(payload.password, user.passwordHash))) {
     return c.json({ message: 'Invalid email or password' }, 401)
   }
 
-  const token = issueAccessToken(user.id)
-  const refresh = issueRefreshToken(user.id, payload.rememberMe)
+  const token = await issueAccessToken(user.id)
+  const refresh = await issueRefreshToken(user.id, payload.rememberMe)
   setRefreshCookie(c, refresh.token, refresh.maxAge)
 
-  return c.json(toAuthResponse(toPublicUser(user), token))
+  return c.json(toAuthResponse(toPublicUser(toUserRecord(user)), token))
 })
 
 authRoutes.post('/register', async (c) => {
   const payload = registerSchema.parse(await c.req.json())
   const email = payload.email.toLowerCase()
 
-  if (store.usersByEmail.has(email)) {
+  const existingUser = await prisma.user.findUnique({ where: { email } })
+  if (existingUser) {
     return c.json({ message: 'An account with this email already exists' }, 409)
   }
 
-  const user: UserRecord = {
-    id: createId('user'),
-    email,
-    name: payload.name,
-    createdAt: new Date().toISOString(),
-    passwordHash: hashPassword(payload.password),
-  }
+  const user = await prisma.user.create({
+    data: {
+      id: createId('user'),
+      email,
+      name: payload.name,
+      passwordHash: await hashPassword(payload.password),
+    },
+  })
 
-  store.users.set(user.id, user)
-  store.usersByEmail.set(email, user.id)
-
-  const token = issueAccessToken(user.id)
-  const refresh = issueRefreshToken(user.id)
+  const token = await issueAccessToken(user.id)
+  const refresh = await issueRefreshToken(user.id)
   setRefreshCookie(c, refresh.token, refresh.maxAge)
 
-  return c.json(toAuthResponse(toPublicUser(user), token), 201)
+  return c.json(toAuthResponse(toPublicUser(toUserRecord(user)), token), 201)
 })
 
-authRoutes.post('/refresh', (c) => {
+authRoutes.post('/refresh', async (c) => {
   const refreshToken = getRefreshTokenFromCookie(c)
-  const session = refreshToken ? store.refreshSessions.get(refreshToken) : null
+  const session = refreshToken
+    ? await prisma.refreshSession.findUnique({
+        where: { token: refreshToken },
+        include: { user: true },
+      })
+    : null
 
-  if (!session || session.expiresAt < Date.now()) {
+  if (!session || session.expiresAt.getTime() < Date.now()) {
     clearRefreshCookie(c)
     if (refreshToken) {
-      revokeRefreshToken(refreshToken)
+      await revokeRefreshToken(refreshToken)
     }
     return c.json({ message: 'Refresh token expired' }, 401)
   }
 
-  const user = store.users.get(session.userId)
+  const user = session.user
   if (!user) {
     clearRefreshCookie(c)
-    revokeRefreshToken(refreshToken)
+    await revokeRefreshToken(refreshToken)
     return c.json({ message: 'User not found' }, 401)
   }
 
-  const token = issueAccessToken(user.id)
-  return c.json(toAuthResponse(toPublicUser(user), token))
+  const token = await issueAccessToken(user.id)
+  return c.json(toAuthResponse(toPublicUser(toUserRecord(user)), token))
 })
 
-authRoutes.post('/logout', (c) => {
+authRoutes.post('/logout', async (c) => {
   const refreshToken = getRefreshTokenFromCookie(c)
-  revokeRefreshToken(refreshToken)
+  const accessToken = getBearerToken(c)
+  await Promise.all([revokeRefreshToken(refreshToken), revokeAccessToken(accessToken)])
   clearRefreshCookie(c)
   return c.body(null, 204)
 })
 
 authRoutes.post('/forgot-password', async (c) => {
   const payload = forgotPasswordSchema.parse(await c.req.json())
-  const userId = store.usersByEmail.get(payload.email.toLowerCase())
+  const user = await prisma.user.findUnique({
+    where: { email: payload.email.toLowerCase() },
+    select: { id: true },
+  })
 
-  if (userId) {
-    const token = createId('reset')
-    store.passwordResets.set(token, {
-      token,
-      userId,
-      expiresAt: Date.now() + 1000 * 60 * 30,
+  if (user) {
+    await prisma.passwordReset.create({
+      data: {
+        token: createId('reset'),
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 1000 * 60 * 30),
+      },
     })
   }
 
@@ -135,19 +125,32 @@ authRoutes.post('/forgot-password', async (c) => {
 
 authRoutes.post('/reset-password', async (c) => {
   const payload = resetPasswordSchema.parse(await c.req.json())
-  const reset = store.passwordResets.get(payload.token)
+  const reset = await prisma.passwordReset.findUnique({
+    where: { token: payload.token },
+    include: { user: true },
+  })
 
-  if (!reset || reset.expiresAt < Date.now() || reset.usedAt) {
+  if (!reset || reset.expiresAt.getTime() < Date.now() || reset.usedAt) {
     return c.json({ message: 'Reset token is invalid or expired' }, 400)
   }
 
-  const user = store.users.get(reset.userId)
+  const user = reset.user
   if (!user) {
     return c.json({ message: 'User not found' }, 404)
   }
 
-  user.passwordHash = hashPassword(payload.password)
-  reset.usedAt = Date.now()
+  const newPasswordHash = await hashPassword(payload.password)
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newPasswordHash },
+    }),
+    prisma.passwordReset.update({
+      where: { token: reset.token },
+      data: { usedAt: new Date() },
+    }),
+  ])
 
   return c.body(null, 204)
 })

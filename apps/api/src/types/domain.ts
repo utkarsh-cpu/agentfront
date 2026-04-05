@@ -20,6 +20,10 @@ export type {
   TaskRecord,
   RefreshSession,
   PasswordResetRecord,
+  Conversation,
+  ChatMessage,
+  CreateConversationInput,
+  UpdateConversationInput,
 } from "@workspace/types"
 
 export {
@@ -31,4 +35,7 @@ export {
   updateAgentSchema,
   runAgentSchema,
   chatSchema,
+  createConversationSchema,
+  updateConversationSchema,
+  chatMessageSchema,
 } from "@workspace/types"

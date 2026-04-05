@@ -3,10 +3,14 @@ import type {
   Message as PrismaMessage,
   Task as PrismaTask,
   User as PrismaUser,
+  Conversation as PrismaConversation,
+  ChatMessage as PrismaChatMessage,
 } from '@prisma/client'
 import type {
   Agent,
   AgentRecord,
+  ChatMessage,
+  Conversation,
   Message,
   Task,
   TaskRecord,
@@ -111,4 +115,29 @@ export function toPublicTask(task: PrismaTask): Task {
   const { userId, ...publicTask } = toTaskRecord(task)
   void userId
   return publicTask
+}
+
+export function toConversation(conversation: PrismaConversation): Conversation {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    modelName: conversation.modelName,
+    systemPrompt: conversation.systemPrompt ?? undefined,
+    tools: parseJson(conversation.toolsJson, [] as string[]),
+    createdAt: conversation.createdAt.toISOString(),
+    updatedAt: conversation.updatedAt.toISOString(),
+  }
+}
+
+export function toChatMessage(message: PrismaChatMessage): ChatMessage {
+  const toolCalls = parseJson(message.toolCallsJson, [] as ToolCall[])
+
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    role: message.role as ChatMessage['role'],
+    content: message.content,
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    createdAt: message.createdAt.toISOString(),
+  }
 }

@@ -19,6 +19,7 @@ model User {
   agents          Agent[]
   tasks           Task[]
   messages        Message[]
+  conversations   Conversation[]
 }
 
 model AccessToken {
@@ -106,4 +107,31 @@ model Message {
   agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([userId, agentId, createdAt])
+}
+
+model Conversation {
+  id           String        @id
+  userId       String
+  title        String        @default("New Conversation")
+  modelName    String
+  systemPrompt String?
+  toolsJson    String        @default("[]")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id             String       @id
+  conversationId String
+  role           String
+  content        String
+  toolCallsJson  String?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

@@ -202,3 +202,51 @@ export type LoginFormData = z.infer<typeof loginSchema>
 export type RegisterFormData = z.infer<typeof registerSchema>
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
+
+// ─── Conversation types ─────────────────────────────────────────
+export interface Conversation {
+  id: string
+  title: string
+  modelName: string
+  systemPrompt?: string
+  tools: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessage {
+  id: string
+  conversationId: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  toolCalls?: ToolCall[]
+  createdAt: string
+}
+
+export interface CreateConversationInput {
+  modelName: string
+  tools?: string[]
+  systemPrompt?: string
+}
+
+export interface UpdateConversationInput {
+  title?: string
+  modelName?: string
+  tools?: string[]
+  systemPrompt?: string
+}
+
+// ─── Conversation Zod schemas ───────────────────────────────────
+export const createConversationSchema = z.object({
+  modelName: z.string().min(1),
+  tools: z.array(z.string()).optional(),
+  systemPrompt: z.string().optional(),
+})
+
+export const updateConversationSchema = createConversationSchema.partial().extend({
+  title: z.string().optional(),
+})
+
+export const chatMessageSchema = z.object({
+  message: z.string().min(1),
+})

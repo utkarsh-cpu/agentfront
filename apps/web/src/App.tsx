@@ -11,7 +11,7 @@ import { AgentsPage } from "./pages/AgentsPage"
 import { CreateAgentPage } from "./pages/CreateAgentPage"
 import { AgentDetailPage } from "./pages/AgentDetailPage"
 import { AgentChatPage } from "./pages/AgentChatPage"
-import { ChatRedirectPage } from "./pages/ChatRedirectPage"
+import { ChatPage } from "./pages/ChatPage"
 import { TasksPage } from "./pages/TasksPage"
 import { TaskDetailPage } from "./pages/TaskDetailPage"
 import { HistoryPage } from "./pages/HistoryPage"
@@ -35,9 +35,12 @@ export function App() {
 
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
+            {/* Chat has its own layout */}
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:conversationId" element={<ChatPage />} />
+
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/chat" replace />} />
-              <Route path="/chat" element={<ChatRedirectPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/agents/new" element={<CreateAgentPage />} />

@@ -1,7 +1,7 @@
-import { defineConfig, env } from 'prisma/config'
+import { defineConfig } from 'prisma/config'
 
-type Env = {
-  DATABASE_URL: string
+function getDatabaseUrl() {
+  return process.env.DATABASE_URL ?? 'file:./prisma/dev.db'
 }
 
 export default defineConfig({
@@ -10,6 +10,6 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: env<Env>('DATABASE_URL'),
+    url: getDatabaseUrl(),
   },
 })

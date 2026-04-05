@@ -15,6 +15,10 @@ export type {
   CreateAgentInput,
   UpdateAgentInput,
   TaskFilters,
+  Conversation,
+  ChatMessage,
+  CreateConversationInput,
+  UpdateConversationInput,
 } from "@workspace/types"
 
 export {

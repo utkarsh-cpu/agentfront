@@ -1,4 +1,4 @@
-import type { AgentRecord, Message, Task, TokenUsage, ToolCall } from '../types/domain.js'
+import type { AgentRecord, ChatMessage, Message, Task, TokenUsage, ToolCall } from '../types/domain.js'
 
 export interface ChatExecutionInput {
   agent: AgentRecord
@@ -10,6 +10,15 @@ export interface ChatExecutionInput {
 export interface TaskExecutionInput {
   agent: AgentRecord
   input: string
+}
+
+export interface ConversationExecutionInput {
+  modelName: string
+  systemPrompt?: string
+  tools: string[]
+  message: string
+  history: ChatMessage[]
+  signal?: AbortSignal
 }
 
 function estimateTokenUsage(input: string, output: string): TokenUsage {
@@ -55,5 +64,24 @@ export async function runAgentTaskExecution({ agent, input }: TaskExecutionInput
     output,
     toolCalls,
     tokenUsage: estimateTokenUsage(input, output),
+  }
+}
+
+export async function* streamConversationReply({ modelName, message, history, signal }: ConversationExecutionInput) {
+  const reply = [
+    `[${modelName}] received your message.`,
+    `Input: ${message}`,
+    `Conversation messages: ${history.length}`,
+  ].join(' ')
+
+  const chunks = reply.split(' ')
+
+  for (const chunk of chunks) {
+    if (signal?.aborted) {
+      break
+    }
+
+    yield `${chunk} `
+    await new Promise((resolve) => setTimeout(resolve, 20))
   }
 }

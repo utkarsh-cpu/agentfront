@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { authRoutes } from './routes/auth.js'
 import { agentRoutes } from './routes/agents.js'
 import { taskRoutes } from './routes/tasks.js'
+import { conversationRoutes } from './routes/conversations.js'
 import { rateLimiter } from './middleware/rate-limit.js'
 
 const app = new Hono()
@@ -31,6 +32,7 @@ app.get('/api/health', (c) => {
 app.route('/api/auth', authRoutes)
 app.route('/api/agents', agentRoutes)
 app.route('/api/tasks', taskRoutes)
+app.route('/api/conversations', conversationRoutes)
 
 app.onError((error, c) => {
   console.error(error)
